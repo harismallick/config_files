@@ -1,0 +1,141 @@
+Command to pass in docker container IDs into docker remove:
+sudo docker remove $(sudo docker ps -a -q)
+
+Command to start docker container with symlink established between local host and container.
+sudo docker run -p 5433:5432 -e POSTGRES_PASSWORD=password -v /home/harismallick/Documents/docker_test/postgres_persisted_data/data:/var/lib/postgresql/data -d postgres
+
+Using this example to for the QC app:
+
+/home/harismallick/Documents/qc_app_archive
+
+
+Stopping a running container using its ID:
+sudo docker stop <ID>
+
+Building a docker image:
+The "." means look for a "Dockerfile" in the cwd
+sudo docker build -t <tag-name> .
+
+Running a docker image:
+sudo docker -p 0000:0000 <docker file>
+To access the app running within the docker container from outside, you must link the internal port number to an external port number.
+
+This allows you to connect into a running docker instance:
+docker exec -t -i <containerID> /bin/bash
+
+Add environment variables into the docker image before running:
+sudo docker run -p 0000:0000 -d --env-file <.env> <docker-image-name>
+
+Docker compose:
+
+Stop all running containers:
+sudo docker stop $(sudo docker ps -a -q)
+
+Remove all containers
+sudo docker remove $(sudo docker ps -a -q)
+
+Delete all local docker images:
+
+sudo docker rmi -f $(sudo docker images -aq)
+
+Link ports and symlink a local directory to a docker container directory:
+
+sudo docker run -p 5000:5000 -v /home/harismallick/Documents/qc_app_archive:/qc_app/backend/runs_archive
+
+This did not work because os.rename() cannot write across 2 different file systems.
+Must use shutil.move() instead.
+https://stackoverflow.com/questions/8858008/how-do-i-move-a-file-in-python
+
+Try using a root directory instead.
+We made a data folder in root
+
+/data/qc_app_archive
+
+# Run command for postgres container link to app container:
+
+## Symlinking (docker refers to it as mounting a volume) archive to host:
+sudo docker run -p 5000:5000 -v /home/harismallick/Documents/qc_app_archive:/qc_app/backend/runs_archive -e DB_USERNAME=postgres qc_app
+
+Running docker compose with an existing image may cause cache-related issues.
+To force a build every time, add the --no-cache argument
+Run the following command:
+
+sudo docker compose build --no-cache
+
+Docker image tags:
+Tags are unique identifiers for the image. The git commit hash of the github repo can be used as a tag, for example.
+This will help the developer to version control docker images.
+
+Hash of the QC app repo used for this example:
+bb7bc5a
+
+Converting docker image into a tarball to transfer image to a server:
+
+sudo docker save qc_app:bb7bc5a > qc_app_bb7bc5a.tar
+
+Once the tarball is made, copy it into the destination server using SCP on linux.
+
+The command is:
+
+scp [OPTION] [user@]SRC_HOST:]file1 [user@]DEST_HOST:]file2
+
+In our example:
+scp ./qc_app_bb7bc5a.tar [user]@[server]:/mnt/data/web_apps/qc_app_docker_image/qc_app_bb7bc5a.tar
+
+/mnt/data/web_apps/qc_app_docker_image/
+
+Command to get the postges image started on the server with creation of a sym-link:
+
+sudo docker run -p 5432:5432 -e POSTGRES_PASSWORD=password -v /mnt/data/web_apps/qc_app_docker_image/db_persisted:/var/lib/postgresql/data -d postgres
+
+
+Creating a sym-link for the archives of the QC runs:
+The link should be created to a directory outside of the directory where the docker image tarball is kept. This is for general data integrity.
+The directory used:
+/mnt/data/web_apps_archives/qc_app_archive
+
+Command to run an image from a tarball:
+
+sudo docker load < <path-to-tarball>
+
+If an env file has been created, it needs to be copied into the server as well.
+
+Command to start the docker container housing the QC app:
+
+sudo docker run --env-file ./.env -p 3024:5000 qc_app:bb7bc5a
+
+This didn't work due to an error. So we needed to use a docker compose yml. That worked, and a successful run was executed.
+This run was logged into the postgres instance.
+
+Create a network to attach containers to:
+This allows containers to communicate using user-given names.
+As long as they're connected to the same network.
+docker network create <name>
+
+The name given is: common
+Its hex id is:
+35f9401d26022e6620368e93ffefed75eeeb7e51c8b36603a0574467ca5eea9a
+
+Start postgres image with the following command to connect it to a common docker network:
+
+sudo docker run -p 5432:5432 -e POSTGRES_PASSWORD=password -v /mnt/data/web_apps/qc_app_docker_image/db_persisted:/var/lib/postgresql/data --name postgres_hm --network=common -d postgres
+
+Start qc_app image with the following command to connect it to a common docker network:
+
+sudo docker run --env-file ./.env -p 3024:5000 --name qc_app --network=common -d qc_app:bb7bc5a
+
+Github actions:
+
+https://github.com/actions/checkout
+https://github.com/actions/upload-artifact
+
+Docker commands for local testing:
+
+sudo docker network create <name>
+
+sudo docker run -p 5433:5432 -e POSTGRES_PASSWORD=password -v /home/harismallick/Documents/test_files/docker_symlink_test/:/var/lib/postgresql/data --name postgres_hm --network=common -d postgres
+
+sudo docker run --env-file ./.env -p 5000:5000 --name qc_app --network=common -d qc_app:ebd1e5b
+
+use gha fine grain token for reading gha in the qc app repo.
+
